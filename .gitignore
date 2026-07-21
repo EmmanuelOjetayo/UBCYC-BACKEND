@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Environment variables (SECRETS)
+.env
+.env.local
+.env.production
+
+# System / IDE files
+.DS_Store
+.vscode/
+npm-debug.log*
