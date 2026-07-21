@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon .env=.env-file Server/app.js"
+    "start": "node Server/app.js",
+    "dev": "nodemon Server/app.js"
   },
   "keywords": [],
   "author": "Emmanuel Ojetayo",
