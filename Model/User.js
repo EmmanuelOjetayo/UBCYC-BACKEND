@@ -8,7 +8,7 @@ const UserSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        default: "camper"
+        default: "user"
     },
     name: String,
     phone: String,
