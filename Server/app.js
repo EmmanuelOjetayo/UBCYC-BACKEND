@@ -51,8 +51,7 @@ app.use(hpp());
 app.use(
   cors({
     origin:[
-  // process.env.CLIENT_URL
-  http://localhost:5173
+  process.env.CLIENT_URL
 ].filter(Boolean),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"]
