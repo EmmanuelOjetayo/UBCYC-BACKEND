@@ -17,7 +17,7 @@ const UserSchema = mongoose.Schema({
     amount_paid:Number,
     team:String,
     bus_no:String,
-    bed_no:, 
+    bed_no:String, 
 
     otp: {
     type: Number,
