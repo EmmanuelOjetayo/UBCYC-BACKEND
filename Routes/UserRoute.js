@@ -3,7 +3,8 @@ const express = require("express");
 const {
   SignUp,
   Login,
-  FetchUserData
+  FetchUserData,
+  ForgotPassword
 } = require("../Controllers/UserController");
 
 const {
@@ -46,7 +47,7 @@ const adminOnly = (req, res, next) => {
 
 UserRoute.post("/signup", SignUp);
 UserRoute.post("/login", Login);
-
+UserRoute.post("/forgot-password", ForgotPassword)
 // ==========================================
 // USER ROUTES
 // ==========================================
