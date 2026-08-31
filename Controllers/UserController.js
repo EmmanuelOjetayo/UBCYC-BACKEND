@@ -125,32 +125,46 @@ const genOTP = () => {
     return Math.floor(100000 + Math.random() * 900000);
 };
 
-// Nodemailer transporter
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
+
+// Forgotten Password Module
+const { BrevoClient } = require("@getbrevo/brevo");
+
+
+// Generate 6-digit OTP
+const genOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000);
+};
+
+
+// Brevo client
+const brevo = new BrevoClient({
+    apiKey: process.env.EMAIL_PASS,
 });
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("SMTP verification failed:", error);
-  } else {
-    console.log("SMTP server is ready to receive messages");
-  }
-});
 
 // Send forgot password OTP email
 const forgotPassMail = async (name, email, otp) => {
     try {
-        const mailOptions = {
-            from: `"GLS Ogbomoso" <${process.env.EMAIL_USER}>`,
-            to: email,
+
+        await brevo.transactionalEmails.sendTransacEmail({
+
+            sender: {
+                name: "SocketMonnie",
+                email: process.env.EMAIL_USER,
+            },
+
+            to: [
+                {
+                    email: email,
+                    name: name || "User",
+                }
+            ],
+
             subject: "Password Reset OTP",
-            html: `
+
+            htmlContent: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+
                     <h2>Password Reset</h2>
 
                     <p>Hello ${name || "User"},</p>
@@ -185,19 +199,20 @@ const forgotPassMail = async (name, email, otp) => {
                         Regards,<br>
                         <strong>SocketMonnie Team</strong>
                     </p>
+
                 </div>
             `,
-        };
-
-        await transporter.sendMail(mailOptions);
+        });
 
         return true;
+
     } catch (error) {
-        console.error("Email sending error:", error);
+
+        console.error("Brevo email sending error:", error);
+
         return false;
     }
 };
-
 
 // Forgot Password Controller
 const ForgotPassword = async (req, res) => {
