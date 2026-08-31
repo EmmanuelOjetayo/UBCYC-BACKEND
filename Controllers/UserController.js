@@ -134,6 +134,14 @@ const transporter = nodemailer.createTransport({
     },
 });
 
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("SMTP verification failed:", error);
+  } else {
+    console.log("SMTP server is ready to receive messages");
+  }
+});
+
 // Send forgot password OTP email
 const forgotPassMail = async (name, email, otp) => {
     try {
