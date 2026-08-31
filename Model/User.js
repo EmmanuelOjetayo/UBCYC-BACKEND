@@ -17,7 +17,17 @@ const UserSchema = mongoose.Schema({
     amount_paid:Number,
     team:String,
     bus_no:String,
-    bed_no:String
+    bed_no:, 
+
+    otp: {
+    type: Number,
+    default: null,
+},
+
+otpExpires: {
+    type: Date,
+    default: null,
+},
 })
 
 module.exports = mongoose.model("Users", UserSchema)
