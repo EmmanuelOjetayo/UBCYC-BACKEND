@@ -117,13 +117,6 @@ const FetchUserData = async (req, res, next) => {
 };
 
 
-// Forgotten PAssword Module
-const nodemailer = require("nodemailer");
-
-// Generate 6-digit OTP
-const genOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000);
-};
 
 
 // Forgotten Password Module
