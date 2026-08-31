@@ -163,7 +163,7 @@ const forgotPassMail = async (name, email, otp) => {
                     <p>Hello ${name || "User"},</p>
 
                     <p>
-                        We received a request to reset your SocketMonnie password.
+                        We received a request to reset your portal password.
                     </p>
 
                     <p>Your OTP is:</p>
