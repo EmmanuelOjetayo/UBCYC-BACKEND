@@ -142,7 +142,7 @@ const forgotPassMail = async (name, email, otp) => {
         await brevo.transactionalEmails.sendTransacEmail({
 
             sender: {
-                name: "SocketMonnie",
+                name: "GLS Ogbomoso",
                 email: process.env.EMAIL_USER,
             },
 
@@ -190,7 +190,7 @@ const forgotPassMail = async (name, email, otp) => {
 
                     <p>
                         Regards,<br>
-                        <strong>SocketMonnie Team</strong>
+                        <strong>GLS OGBOMOSO Team</strong>
                     </p>
 
                 </div>
