@@ -24,54 +24,80 @@ exports.verifyPayment = async (req, res, next) => {
     const secretHash = process.env.FLW_SECRET_HASH;
     const isWebhook = Boolean(signature && secretHash && signature === secretHash);
 
-    let transactionId, txRef, camperId;
+    let transactionId, txRef, camperId, resolutionMethod;
 
     if (isWebhook) {
-      // Flutterwave nests everything under `data` in webhook payloads,
-      // including whatever `meta` object was passed at checkout initialization.
       const data = body.data || body;
       transactionId = data.id?.toString();
       txRef = data.tx_ref;
-      camperId = data.meta?.camper_id || null;
-      console.log(`[WEBHOOK] TX: ${txRef} | Camper: ${camperId}`);
+
+      // Guard 1: meta.camper_id (primary, most trustworthy — set by us at init)
+      if (data.meta?.camper_id) {
+        camperId = data.meta.camper_id;
+        resolutionMethod = 'meta.camper_id';
+      } else {
+        console.warn(`[GUARD 1 FAILED] meta.camper_id missing. TX: ${transactionId} | TxRef: ${txRef}`);
+      }
+
+      // Guard 2: meta.camperId (alt casing fallback)
+      if (!camperId && data.meta?.camperId) {
+        camperId = data.meta.camperId;
+        resolutionMethod = 'meta.camperId (alt casing)';
+        console.warn(`[GUARD 2 USED] Resolved via alt-case meta field. TX: ${transactionId}`);
+      } else if (!camperId) {
+        console.warn(`[GUARD 2 FAILED] meta.camperId (alt casing) also missing. TX: ${transactionId}`);
+      }
+
+      console.log(`[WEBHOOK] TX: ${txRef} | Camper (pre-verify): ${camperId || 'UNRESOLVED'}`);
     } else {
       // Manual/callback path: the frontend already knows the logged-in
       // camper's own _id and sends it directly — no parsing required.
       transactionId = body.transaction_id?.toString();
       txRef = body.tx_ref;
       camperId = body.camperId || null;
+      resolutionMethod = 'body.camperId (manual)';
       console.log(`[MANUAL] TX: ${txRef} | Camper: ${camperId}`);
     }
 
-    // --- 2. Validate required data BEFORE touching the database ---
-    if (!transactionId || !txRef || !camperId) {
-      console.error(`[CRITICAL] Missing IDs. TX_ID: ${transactionId}, TxRef: ${txRef}, Camper: ${camperId}`);
+    // --- 2. Validate the minimum needed to even call Flutterwave ---
+    // NOTE: camperId is intentionally NOT required yet on the webhook path —
+    // Guards 3/4 below still get a chance to resolve it using verified data.
+    if (!transactionId || !txRef) {
+      console.error(`[CRITICAL] Missing transaction identifiers. TX_ID: ${transactionId}, TxRef: ${txRef}`);
       const err = new Error("Incomplete transaction data");
       err.statusCode = 400;
       throw err;
     }
 
-    // Reject malformed camperId early — this is what previously let a
-    // garbage value ("OGB") slip through and produce a bad Payment record.
-    if (!mongoose.Types.ObjectId.isValid(camperId)) {
-      console.error(`[CRITICAL] Invalid camperId format: ${camperId} (TX: ${transactionId})`);
-      const err = new Error("Invalid camper identifier");
+    // On the manual path camperId IS required immediately — there's no
+    // verify-response fallback available/needed for it, it's just client-supplied.
+    if (!isWebhook && !camperId) {
+      console.error(`[CRITICAL] Manual call missing camperId. TX: ${transactionId}`);
+      const err = new Error("Incomplete transaction data");
       err.statusCode = 400;
       throw err;
     }
 
     // --- 3. Verify with Flutterwave (source of truth) ---
-    const flwRes = await axios.get(
-      `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
-          'Content-Type': 'application/json'
+    let flwData;
+    try {
+      const flwRes = await axios.get(
+        `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
+      flwData = flwRes.data;
+    } catch (flwError) {
+      console.error(`[FLW VERIFY ERROR] TX: ${transactionId} | Status: ${flwError.response?.status} | Message: ${flwError.response?.data?.message || flwError.message}`);
+      const err = new Error("Flutterwave verification request failed");
+      err.statusCode = 502;
+      throw err;
+    }
 
-    const flwData = flwRes.data;
     if (flwData.status !== 'success' || flwData.data?.status !== 'successful') {
       console.log(`[FAILED] FLW Verification for TX: ${transactionId}`);
       const err = new Error("Flutterwave verification failed");
@@ -79,9 +105,58 @@ exports.verifyPayment = async (req, res, next) => {
       throw err;
     }
 
-    // --- 4. Cross-check: the tx_ref Flutterwave verified must match the one
-    // we were given. This prevents a client (on the manual path) from reusing
-    // someone else's transaction_id with a different tx_ref/camperId. ---
+    // --- 3b. Webhook-only: try to resolve camperId further using verified data ---
+    if (isWebhook && !camperId) {
+      // Guard 3: match by verified customer email (reliable regardless of payment method)
+      if (flwData.data?.customer?.email) {
+        const emailMatch = await User.findOne({ email: flwData.data.customer.email });
+        if (emailMatch) {
+          camperId = emailMatch._id.toString();
+          resolutionMethod = 'customer.email';
+          console.warn(`[GUARD 3 USED] Resolved via email match: ${flwData.data.customer.email} → ${camperId}`);
+        } else {
+          console.warn(`[GUARD 3 FAILED] No camper found for email: ${flwData.data.customer.email}. TX: ${transactionId}`);
+        }
+      } else {
+        console.warn(`[GUARD 3 FAILED] Flutterwave returned no customer.email. TX: ${transactionId}`);
+      }
+
+      // Guard 4: match by verified customer phone number (weaker, last resort)
+      if (!camperId && flwData.data?.customer?.phone_number) {
+        const phoneMatch = await User.findOne({ phone: flwData.data.customer.phone_number });
+        if (phoneMatch) {
+          camperId = phoneMatch._id.toString();
+          resolutionMethod = 'customer.phone_number';
+          console.warn(`[GUARD 4 USED] Resolved via phone match: ${flwData.data.customer.phone_number} → ${camperId}`);
+        } else {
+          console.warn(`[GUARD 4 FAILED] No camper found for phone: ${flwData.data.customer.phone_number}. TX: ${transactionId}`);
+        }
+      } else if (!camperId) {
+        console.warn(`[GUARD 4 FAILED] Flutterwave returned no customer.phone_number. TX: ${transactionId}`);
+      }
+
+      // Final: every guard exhausted — dump everything for manual review
+      if (!camperId) {
+        console.error(`[UNRESOLVED] Could not identify camper after all guards. TX: ${transactionId} | TxRef: ${txRef}`);
+        console.error(`[FLW RAW WEBHOOK BODY]`, JSON.stringify(body, null, 2));
+        console.error(`[FLW VERIFY RESPONSE]`, JSON.stringify(flwData, null, 2));
+        const err = new Error("Could not identify camper for this transaction");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      console.log(`[RESOLVED via ${resolutionMethod}] Camper: ${camperId} | TX: ${transactionId}`);
+    }
+
+    // Reject malformed camperId — stops a bad value from ever reaching Payment.create()
+    if (!mongoose.Types.ObjectId.isValid(camperId)) {
+      console.error(`[CRITICAL] Invalid camperId format: ${camperId} (TX: ${transactionId})`);
+      const err = new Error("Invalid camper identifier");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // --- 4. Cross-check: the tx_ref Flutterwave verified must match the one we were given ---
     if (flwData.data.tx_ref !== txRef) {
       console.error(`[SECURITY] tx_ref mismatch. Expected: ${flwData.data.tx_ref}, Got: ${txRef}`);
       const err = new Error("Transaction reference mismatch");
@@ -101,8 +176,6 @@ exports.verifyPayment = async (req, res, next) => {
     }
 
     // --- 6. Idempotency: prevent duplicate processing ---
-    // Keyed on Flutterwave's own transaction id (immutable, not client-editable)
-    // in addition to reference, since reference alone has no unique DB index.
     const existingPayment = await Payment.findOne({
       $or: [{ reference: txRef }, { transactionId }]
     });
@@ -112,8 +185,6 @@ exports.verifyPayment = async (req, res, next) => {
     }
 
     // --- 7. Confirm the camper actually exists BEFORE writing a Payment record ---
-    // (Previously Payment.create() ran first, so a bad camperId could still
-    // leave a stranded payment record that permanently blocked reprocessing.)
     const camper = await User.findById(camperId);
     if (!camper) {
       console.error(`[CRITICAL] Camper not found: ${camperId} (TX: ${transactionId})`);
