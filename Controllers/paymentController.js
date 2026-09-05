@@ -6,7 +6,7 @@ const axios = require('axios');
 // Constants (match frontend)
 const TEAMS = ["KETER", "KAVOD", "KISSEH", "KLIRONOMOS", "ARMON", "SHARBIT", "MALCHUT", "MEMSHALAH"];
 const BUSES = ["1", "2", "3", "4", "5"];
-const TARGET_FEE = Number(process.env.TARGET_FEE) || 5000;
+const TARGET_FEE = Number(process.env.TARGET_FEE) || 2000;
 
 /**
  * POST /api/payment/verify
