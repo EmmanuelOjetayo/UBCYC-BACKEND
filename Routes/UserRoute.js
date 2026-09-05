@@ -13,7 +13,10 @@ const {
   GetMealLogs,
   GetSouvenirCount,
   RoleUpdate,
-  ScanMeal
+  ScanMeal,
+  ScanSouvenir,
+  GetSouvenirLogs,
+  ResetSession
 } = require("../Controllers/AdminController");
 
 const auth = require("../Middleware/AuthMiddleware");
@@ -94,5 +97,9 @@ UserRoute.post(
   adminOnly,
   ScanMeal
 );
+
+UserRoute.post("/admin/souvenir-scan", auth, adminOnly, ScanSouvenir);
+UserRoute.get("/admin/souvenir-logs", auth, adminOnly, GetSouvenirLogs);
+UserRoute.post("/admin/reset-session", auth, adminOnly, ResetSession);
 
 module.exports = UserRoute;
