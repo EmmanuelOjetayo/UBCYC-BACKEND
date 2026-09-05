@@ -101,11 +101,7 @@ const ResetSession = async (req, res, next) => {
     }
 };
 
-module.exports = {
-    ScanSouvenir,      // <-- Exported
-    GetSouvenirLogs,   // <-- Exported
-    ResetSession       // <-- Exported
-};
+
 
 const GetCampers = async (req, res, next) => {
     try {
@@ -216,6 +212,9 @@ const ScanMeal = async (req, res, next) => {
 };
 
 module.exports = {
+    ScanSouvenir,
+    GetSouvenirLogs,
+    ResetSession,
     GetCampers,
     GetMealLogs,
     GetSouvenirCount,
