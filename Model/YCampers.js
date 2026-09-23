@@ -1,16 +1,20 @@
 const mongoose = require("mongoose");
 
-const UserSchema = new mongoose.Schema(
+const YCampersSchema = new mongoose.Schema(
     {
         email: {
             type: String,
-            required: true,
-            unique: true
+            required: true
         },
 
         role: {
             type: String,
             default: "user"
+        },
+
+        type: {
+            type: String,
+            default: "ubcyc"
         },
 
         name: String,
@@ -20,6 +24,17 @@ const UserSchema = new mongoose.Schema(
         gender: String,
 
         password: String,
+
+        amount_paid: {
+            type: Number,
+            default: 0
+        },
+
+        team: String,
+
+        bus_no: String,
+
+        bed_no: String,
 
         resetPasswordToken: {
             type: String,
@@ -36,7 +51,14 @@ const UserSchema = new mongoose.Schema(
     }
 );
 
-module.exports = mongoose.model(
-    "Users",
-    UserSchema
+YCampersSchema.index(
+    {
+        email: 1,
+        type: 1
+    },
+    {
+        unique: true
+    }
 );
+
+module.exports = mongoose.model("ycampers", YCampersSchema);

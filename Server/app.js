@@ -75,7 +75,7 @@ app.use(
 
 const limiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 Minutes
-  max: 30,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
