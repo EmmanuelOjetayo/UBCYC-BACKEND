@@ -5,7 +5,7 @@ const {
   Login,
   FetchUserData,
   ForgotPassword,
-  ResetPassword
+  VerifyOTP
 } = require("../Controllers/UserController");
 
 const {
@@ -16,10 +16,7 @@ const {
   ScanSouvenir,
   ResetSession,
   RoleUpdate,
-  ScanMeal,
-  ScanPresummit,
-  GetPresummitCounts,
-  GetPresummitLogs
+  ScanMeal
 } = require("../Controllers/AdminController");
 
 const auth = require("../Middleware/AuthMiddleware");
@@ -57,7 +54,7 @@ UserRoute.post("/login", Login);
 // PASSWORD RESET
 // ==========================================
 UserRoute.post("/forgot-password", ForgotPassword);
-UserRoute.post("/reset-password/:token", ResetPassword);
+UserRoute.post("/verifyOtp", VerifyOTP);
 
 // ==========================================
 // USER ROUTES
@@ -75,10 +72,5 @@ UserRoute.post("/admin/souvenir-scan", auth, adminOnly, ScanSouvenir);
 UserRoute.post("/admin/reset-session", auth, adminOnly, ResetSession);
 UserRoute.put("/admin/campers/:id/role", auth, adminOnly, RoleUpdate);
 UserRoute.post("/admin/meal-scan", auth, adminOnly, ScanMeal);
-
-// Presummit Attendance Routes
-UserRoute.post("/admin/presummit-scan", auth, adminOnly, ScanPresummit);
-UserRoute.get("/admin/presummit-counts", auth, adminOnly, GetPresummitCounts);
-UserRoute.get("/admin/presummit-logs", auth, adminOnly, GetPresummitLogs);
 
 module.exports = UserRoute;

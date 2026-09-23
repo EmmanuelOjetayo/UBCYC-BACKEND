@@ -1,9 +1,9 @@
-const express = require("express");
 const joi = require("joi");
 const bcrypt = require("bcrypt");
 const Users = require("../Model/User");
 const PayRecords = require("../Model/PaymentCol");
-const genJWT = require("../utilis/genJWT");
+const genJWT = require("../utils/genJWT");
+const { sendOTPMail } = require("../utils/sendMail");
 
 const signUpSchema = joi.object({
     name: joi.string(),
@@ -87,7 +87,7 @@ const Login = async (req, res, next) => {
             user: {
                 id: user._id,
                 role: user.role,
-                token: genJWT(user._id)
+                token: genJWT(user._id, "gls")
             }
         });
     } catch (error) {
@@ -116,103 +116,14 @@ const FetchUserData = async (req, res, next) => {
     }
 };
 
+// ─────────────────────────────────────────────────────────────
+// FORGOT PASSWORD
+// ─────────────────────────────────────────────────────────────
 
-
-
-// Forgotten Password Module
-const { BrevoClient } = require("@getbrevo/brevo");
-
-
-// Generate 6-digit OTP
-const genOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000);
-};
-
-
-// Brevo client
-const brevo = new BrevoClient({
-    apiKey: process.env.EMAIL_PASS,
-});
-
-
-// Send forgot password OTP email
-const forgotPassMail = async (name, email, otp) => {
-    try {
-
-        await brevo.transactionalEmails.sendTransacEmail({
-
-            sender: {
-                name: "GLS Ogbomoso",
-                email: process.env.EMAIL_USER,
-            },
-
-            to: [
-                {
-                    email: email,
-                    name: name || "User",
-                }
-            ],
-
-            subject: "Password Reset OTP",
-
-            htmlContent: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
-
-                    <h2>Password Reset</h2>
-
-                    <p>Hello ${name || "User"},</p>
-
-                    <p>
-                        We received a request to reset your portal password.
-                    </p>
-
-                    <p>Your OTP is:</p>
-
-                    <div style="
-                        font-size: 32px;
-                        font-weight: bold;
-                        letter-spacing: 8px;
-                        padding: 20px;
-                        background: #f5f5f5;
-                        text-align: center;
-                        margin: 20px 0;
-                    ">
-                        ${otp}
-                    </div>
-
-                    <p>
-                        This OTP will expire in <strong>10 minutes</strong>.
-                    </p>
-
-                    <p>
-                        If you did not request a password reset, you can safely ignore this email.
-                    </p>
-
-                    <p>
-                        Regards,<br>
-                        <strong>GLS OGBOMOSO Team</strong>
-                    </p>
-
-                </div>
-            `,
-        });
-
-        return true;
-
-    } catch (error) {
-
-        console.error("Brevo email sending error:", error);
-
-        return false;
-    }
-};
-
-// Forgot Password Controller
 const ForgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
 
-        // Validate email
         if (!email) {
             return res.status(400).json({
                 success: false,
@@ -220,7 +131,6 @@ const ForgotPassword = async (req, res) => {
             });
         }
 
-        // Find user
         const user = await Users.findOne({ email });
 
         if (!user) {
@@ -230,26 +140,17 @@ const ForgotPassword = async (req, res) => {
             });
         }
 
-        // Generate OTP
-        const otp = genOTP();
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000);
 
-        // Save OTP to user
         user.otp = otp;
-
-        // Optional: save expiration time
-        user.otpExpires = Date.now() + 10 * 60 * 1000;
-
+        user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
         await user.save();
 
-        // Send email
-        const sendMail = await forgotPassMail(
-            user.name,
-            user.email,
-            otp
-        );
+        // Send via central sendMail.js
+        const sent = await sendOTPMail({ to: user.email, name: user.name, otp });
 
-        // If email failed
-        if (!sendMail) {
+        if (!sent) {
             return res.status(500).json({
                 success: false,
                 message: "Failed to send OTP email",
@@ -263,15 +164,12 @@ const ForgotPassword = async (req, res) => {
 
     } catch (e) {
         console.error("Forgot password error:", e);
-
         return res.status(500).json({
             success: false,
             message: "Server Error",
         });
     }
 };
-
-
 
 const VerifyOTP = async (req, res) => {
     try {

@@ -1,10 +1,8 @@
 const User = require('../Model/User');
 const Payment = require('../Model/PaymentCol');
 const axios = require('axios');
+const mongoose = require('mongoose');
 
-// Constants (match frontend)
-const TEAMS = ["KETER", "KAVOD", "KISSEH", "KLIRONOMOS", "ARMON", "SHARBIT", "MALCHUT", "MEMSHALAH"];
-const BUSES = ["1", "2", "3", "4", "5"];
 const TARGET_FEE = Number(process.env.TARGET_FEE) || 5000;
 
 /**
@@ -12,8 +10,7 @@ const TARGET_FEE = Number(process.env.TARGET_FEE) || 5000;
  * - Accepts Flutterwave webhook OR manual call from frontend
  * - Verifies transaction with Flutterwave
  * - Records payment (idempotent)
- * - Updates camper wallet
- * - Assigns team/bus/bed when target reached
+ * - Updates camper wallet amount_paid and status
  */
 exports.verifyPayment = async (req, res, next) => {
   try {
@@ -28,19 +25,19 @@ exports.verifyPayment = async (req, res, next) => {
     if (signature && signature === secretHash) {
       transactionId = (body.id || body.data?.id)?.toString();
       txRef = body.tx_ref || body.data?.tx_ref;
-      camperId = body.meta?.camper_id || (txRef?.includes('-') ? txRef.split('-')[1] : null);
+      camperId = body.meta?.camper_id || body.data?.meta?.camper_id;
       console.log(`[WEBHOOK] TX: ${txRef} | Camper: ${camperId}`);
     } else {
       transactionId = body.transaction_id?.toString();
       txRef = body.tx_ref;
-      camperId = body.camperId || (txRef?.includes('-') ? txRef.split('-')[1] : null);
+      camperId = body.camperId || body.meta?.camper_id || req.user?._id;
       console.log(`[MANUAL] TX: ${txRef} | Camper: ${camperId}`);
     }
 
     // Validate required data
-    if (!transactionId || !camperId) {
-      console.error(`[CRITICAL] Missing IDs. TX_ID: ${transactionId}, Camper: ${camperId}`);
-      const err = new Error("Incomplete transaction data");
+    if (!transactionId || !txRef || !camperId || !mongoose.Types.ObjectId.isValid(camperId)) {
+      console.error(`[CRITICAL] Incomplete or invalid transaction data. TX_ID: ${transactionId}, txRef: ${txRef}, Camper: ${camperId}`);
+      const err = new Error("Incomplete or invalid transaction data");
       err.statusCode = 400;
       throw err;
     }
@@ -103,38 +100,7 @@ exports.verifyPayment = async (req, res, next) => {
     camper.amount_paid = newBalance;
     camper.status = newBalance >= TARGET_FEE ? 'paid' : 'pending';
 
-    // --- 7. Logistics assignment (only if reaching target for the first time) ---
-    if (newBalance >= TARGET_FEE && !camper.team) {
-      const globalPaidCount = await User.countDocuments({ team: { $ne: null } });
-      const genderPaidCount = await User.countDocuments({
-        gender: camper.gender,
-        bed_no: { $ne: null }
-      });
-
-      // Round-robin assignments
-      camper.team = TEAMS[globalPaidCount % TEAMS.length];
-      camper.bus_no = BUSES[globalPaidCount % BUSES.length];
-
-      // Sequential bed assignment per gender
-      const prefix = (camper.gender === "Male" || camper.gender === "M") ? "M" : "F";
-      let bedNum = genderPaidCount + 1;
-      let bedAssigned = false;
-
-      while (!bedAssigned) {
-        const candidate = `${prefix}-${String(bedNum).padStart(3, '0')}`;
-        const existingBed = await User.findOne({ bed_no: candidate });
-        if (!existingBed) {
-          camper.bed_no = candidate;
-          bedAssigned = true;
-        } else {
-          bedNum++;
-        }
-      }
-
-      console.log(`[LOGISTICS] Camper ${camperId} → Team: ${camper.team} | Bus: ${camper.bus_no} | Bed: ${camper.bed_no}`);
-    }
-
-    // --- 8. Save camper updates ---
+    // --- 7. Save camper updates ---
     await camper.save();
 
     console.log(`[COMPLETE] Camper: ${camperId} | New Balance: ₦${newBalance}`);

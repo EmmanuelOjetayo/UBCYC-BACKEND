@@ -51,8 +51,8 @@ const auth = async (req, res, next) => {
     console.log("✅ JWT VERIFIED:");
     console.log(decoded);
 
-    if (!decoded.id || !decoded.type) {
-      console.log("❌ Missing id/type");
+    if (!decoded.id) {
+      console.log("❌ Missing id");
 
       return res.status(401).json({
         success: false,
@@ -63,29 +63,14 @@ const auth = async (req, res, next) => {
     let user;
 
     if (decoded.type === "ubcyc") {
-
       console.log("🔵 Looking in YCampers");
-
-      user = await ycampers
-        .findById(decoded.id)
-        .select("-password");
-
-    } else if (decoded.type === "gls") {
-
-      console.log("🟢 Looking in Users");
-
-      user = await Users
-        .findById(decoded.id)
-        .select("-password");
-
+      user = await ycampers.findById(decoded.id).select("-password");
     } else {
-
-      console.log("❌ Unknown type:", decoded.type);
-
-      return res.status(401).json({
-        success: false,
-        message: "Invalid account type"
-      });
+      console.log("🟢 Looking in Users");
+      user = await Users.findById(decoded.id).select("-password");
+      if (!user && !decoded.type) {
+        user = await ycampers.findById(decoded.id).select("-password");
+      }
     }
 
     if (!user) {

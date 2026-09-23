@@ -1,6 +1,6 @@
 const joi = require("joi");
-const MealLogs = require("../Model/MealLogs");
-const Souvenirs = require("../Model/Souvenier");
+const MealLogs = require("../Model/YMealLogs");
+const Souvenirs = require("../Model/YSouvenir");
 const Users = require("../Model/User");
 const Payment = require("../Model/PaymentCol");
 
@@ -82,13 +82,11 @@ const ResetSession = async (req, res, next) => {
         await Souvenirs.deleteMany({});
         await MealLogs.deleteMany({});
 
-        // Reset user balances and logistics, keep attendee accounts
+        // Reset user balances, keep attendee accounts
         await Users.updateMany({}, {
             $set: {
                 amount_paid: 0,
-                team: null,
-                bus_no: null,
-                bed_no: null
+                status: "pending"
             }
         });
 

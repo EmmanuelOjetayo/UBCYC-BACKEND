@@ -6,14 +6,18 @@ const PaymentCollection = mongoose.Schema({
         ref:"Users",
         required:true
     },
-    reference:String,
+    reference: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
     date: Date,
     year: Number,
-    status:{
-        type:String
+    status: {
+        type: String
     },
-    amount:Number,
+    amount: Number,
 
-}, { timestamps: true}) // automatically adds createdAt and updatedAt 
+}, { timestamps: true }) // automatically adds createdAt and updatedAt 
 
 module.exports = mongoose.model("PayRecords", PaymentCollection)

@@ -3,7 +3,7 @@ require("dotenv").config({
   path: require("path").join(__dirname, "../.env")
 });
 
-function genJWT(id, type) {
+function genJWT(id, type = "gls") {
   return jwt.sign(
     {
       id,
@@ -11,7 +11,7 @@ function genJWT(id, type) {
     },
     process.env.JWT_SECRET,
     {
-      expiresIn: "1h"
+      expiresIn: "30d"
     }
   );
 }

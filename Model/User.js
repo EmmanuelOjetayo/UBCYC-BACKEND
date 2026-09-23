@@ -21,12 +21,22 @@ const UserSchema = new mongoose.Schema(
 
         password: String,
 
-        resetPasswordToken: {
+        amount_paid: {
+            type: Number,
+            default: 0
+        },
+
+        status: {
             type: String,
+            default: "pending"
+        },
+
+        otp: {
+            type: Number,
             default: null
         },
 
-        resetPasswordExpires: {
+        otpExpires: {
             type: Date,
             default: null
         }

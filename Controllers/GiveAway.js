@@ -8,9 +8,6 @@ dotenv.config({
 const User = require('../Model/User');
 const Payment = require('../Model/PaymentCol');
 
-// Constants
-const TEAMS = ["KETER", "KAVOD", "KISSEH", "KLIRONOMOS", "ARMON", "SHARBIT", "MALCHUT", "MEMSHALAH"];
-const BUSES = ["1", "2", "3", "4", "5"];
 const TARGET_FEE = Number(process.env.TARGET_FEE) || 5000;
 
 // --- RESOLVE RECEIVER NAME ---
@@ -84,45 +81,12 @@ exports.transferGiveaway = async (req, res, next) => {
     sender.amount_paid = newSenderBalance;
     await sender.save();
 
-    // 5. Prepare receiver update payload
-    let receiverUpdate = {
-      amount_paid: receiverNewBalance,
-      status: receiverNewBalance >= TARGET_FEE ? 'paid' : 'pending'
-    };
+    // 5. Update receiver balance and status
+    receiver.amount_paid = receiverNewBalance;
+    receiver.status = receiverNewBalance >= TARGET_FEE ? 'paid' : 'pending';
+    await receiver.save();
 
-    // 6. LOGISTICS ASSIGNMENT for receiver
-    if (receiverNewBalance >= TARGET_FEE && !receiver.team) {
-      const globalPaidCount = await User.countDocuments({ team: { $ne: null } });
-      const genderPaidCount = await User.countDocuments({
-        gender: receiver.gender,
-        bed_no: { $ne: null }
-      });
-
-      receiverUpdate.team = TEAMS[globalPaidCount % TEAMS.length];
-      receiverUpdate.bus_no = BUSES[globalPaidCount % BUSES.length];
-
-      const prefix = (receiver.gender === "Male" || receiver.gender === "M") ? "M" : "F";
-      let bedNum = genderPaidCount + 1;
-      let bedAssigned = false;
-
-      while (!bedAssigned) {
-        const candidate = `${prefix}-${String(bedNum).padStart(3, '0')}`;
-        const existingBed = await User.findOne({ bed_no: candidate });
-        if (!existingBed) {
-          receiverUpdate.bed_no = candidate;
-          bedAssigned = true;
-        } else {
-          bedNum++;
-        }
-      }
-
-      console.log(`[GIVEAWAY LOGISTICS] Receiver ${receiverId} → Team: ${receiverUpdate.team} | Bus: ${receiverUpdate.bus_no} | Bed: ${receiverUpdate.bed_no}`);
-    }
-
-    // Update receiver in database
-    await User.findByIdAndUpdate(receiverId, receiverUpdate);
-
-    // 7. Log payment history for both sender and receiver
+    // 6. Log payment history for both sender and receiver
     const senderFirstName = sender.name ? sender.name.split(' ')[0].toUpperCase() : 'USER';
     const receiverFirstName = receiver.name ? receiver.name.split(' ')[0].toUpperCase() : 'USER';
 
@@ -145,7 +109,7 @@ exports.transferGiveaway = async (req, res, next) => {
 
     res.status(200).json({ 
       success: true, 
-      message: 'Transfer successful and logistics assigned' 
+      message: 'Transfer successful' 
     });
 
   } catch (err) {
