@@ -10,19 +10,7 @@ require("dotenv").config({
 const auth = async (req, res, next) => {
   try {
 
-    console.log("\n========== AUTH CHECK ==========");
-
-    console.log("Authorization:", req.headers.authorization);
-
-    console.log(
-      "JWT_SECRET exists:",
-      !!process.env.JWT_SECRET
-    );
-
-    console.log(
-      "JWT_SECRET length:",
-      process.env.JWT_SECRET?.length
-    );
+  
 
     if (
       !req.headers.authorization ||
@@ -38,22 +26,14 @@ const auth = async (req, res, next) => {
 
     const token = req.headers.authorization.split(" ")[1];
 
-    console.log(
-      "Token received:",
-      token?.substring(0, 30) + "..."
-    );
 
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET
     );
 
-    console.log("✅ JWT VERIFIED:");
-    console.log(decoded);
 
     if (!decoded.id) {
-      console.log("❌ Missing id");
-
       return res.status(401).json({
         success: false,
         message: "Invalid authentication token"
@@ -75,7 +55,6 @@ const auth = async (req, res, next) => {
 
     if (!user) {
 
-      console.log("❌ User not found:", decoded.id);
 
       return res.status(401).json({
         success: false,
@@ -87,8 +66,7 @@ const auth = async (req, res, next) => {
     req.user.type = decoded.type;
 
     console.log("✅ AUTH SUCCESS");
-    console.log("User:", user._id);
-    console.log("Type:", decoded.type);
+
 
     next();
 
